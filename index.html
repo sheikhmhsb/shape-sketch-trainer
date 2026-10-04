@@ -67,6 +67,8 @@ pre{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:10p
 #seen{width:84px;height:84px;image-rendering:pixelated;border-radius:8px;border:1px solid var(--line);background:#000}
 .note{font-size:15px;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){.bar>i{transition:none}}
+
+a.navlink{color:var(--accent);font:600 14px var(--font-body)}
 </style>
 </head>
 <body>
@@ -77,6 +79,7 @@ pre{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:10p
     <h1>Shape Sketch Trainer</h1>
     <p class="lede">A complete machine-learning loop on one page. It creates its own training pictures, trains a small neural network on them while you watch, then uses the trained model to recognize a shape you draw. Nothing is sent to a server.</p>
     <p class="mono muted" id="backend">Loading TensorFlow.js…</p>
+    <a class="navlink" href="chatbot.html">Try the text version: Tiny Chatbot Trainer →</a>
   </header>
 
   <section class="panel" aria-labelledby="s1">
