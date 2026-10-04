@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shape Sketch Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one column, three real steps (data → train → use), each a bordered panel */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --ink:#1b2230; --muted:#5b6578; --line:#d8dde6;
+  --accent:#2f5bd3; --accent-soft:#e6ecfb; --accent2:#c97a06; --good:#1f8a4c;
+  --font-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --font-body:"Source Sans 3",ui-sans-serif,system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10141b; --surface:#181e28; --ink:#e7eaf0; --muted:#9aa4b5; --line:#2a3240;
+  --accent:#7aa2ff; --accent-soft:#1e2a45; --accent2:#f2a93b; --good:#4cc47f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10141b; --surface:#181e28; --ink:#e7eaf0; --muted:#9aa4b5; --line:#2a3240;
+  --accent:#7aa2ff; --accent-soft:#1e2a45; --accent2:#f2a93b; --good:#4cc47f; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:17px/1.6 var(--font-body);padding-inline:16px;padding-block:32px 64px}
+.wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1,h2{font-family:var(--font-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(2rem,5vw,2.9rem);font-weight:700;letter-spacing:-.02em}
+h2{font-size:1.45rem;font-weight:700}
+p{margin:0;max-width:66ch}
+.lede{color:var(--muted);font-size:1.1rem}
+header{display:flex;flex-direction:column;gap:10px}
+.tag{font:600 12px/1 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.step-head{display:flex;gap:14px;align-items:baseline}
+.num{font:600 13px/1 var(--font-mono);color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:5px 9px;flex:none}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+button{font:600 15px/1 var(--font-body);border-radius:9px;padding:11px 16px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--font-mono);font-size:13px;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:10px}
+.thumb{display:flex;flex-direction:column;align-items:center;gap:4px}
+.thumb canvas{width:56px;height:56px;image-rendering:pixelated;border-radius:6px;display:block}
+.thumb span{font:400 11px/1 var(--font-mono);color:var(--muted)}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+@media (max-width:760px){.cols{grid-template-columns:minmax(0,1fr)}}
+pre{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;overflow-x:auto;font:13px/1.55 var(--font-mono);color:var(--ink)}
+.c{color:var(--muted)}
+.chartbox{position:relative;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+#chart{width:100%;height:220px;display:block}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font:12px var(--font-mono);color:var(--muted)}
+.sw{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+.log{max-height:170px;overflow:auto}
+.padwrap{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+#pad{width:min(280px,100%);aspect-ratio:1;max-width:100%;border-radius:12px;touch-action:none;cursor:crosshair;display:block;background:#000}
+.result{display:flex;flex-direction:column;gap:14px}
+.probrow{display:grid;grid-template-columns:80px minmax(0,1fr) 56px;gap:10px;align-items:center}
+.probrow .bar{height:14px}
+.probrow.top .bar>i{background:var(--good)}
+.verdict{font-family:var(--font-display);font-size:1.6rem;font-weight:700}
+.seen{display:flex;gap:12px;align-items:center}
+#seen{width:84px;height:84px;image-rendering:pixelated;border-radius:8px;border:1px solid var(--line);background:#000}
+.note{font-size:15px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.bar>i{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <span class="tag">TensorFlow.js · runs in your browser</span>
+    <h1>Shape Sketch Trainer</h1>
+    <p class="lede">A complete machine-learning loop on one page. It creates its own training pictures, trains a small neural network on them while you watch, then uses the trained model to recognize a shape you draw. Nothing is sent to a server.</p>
+    <p class="mono muted" id="backend">Loading TensorFlow.js…</p>
+  </header>
+
+  <section class="panel" aria-labelledby="s1">
+    <div class="step-head"><span class="num">1</span><h2 id="s1">Make the training data</h2></div>
+    <p>A model learns from labeled examples. Here we generate <b id="nTotal">1,800</b> wobbly, hand-drawn-looking shapes at 28×28 pixels, each tagged as a circle, square or triangle. Sizes, positions, rotations and line widths are random so the model learns the shape itself, not one exact picture.</p>
+    <div class="gallery" id="gallery" aria-label="Sample training images"></div>
+    <div class="row"><button id="regen">Show other samples</button><span class="mono muted">Each image becomes 784 numbers (28 × 28 pixels, 0 = black, 1 = white).</span></div>
+  </section>
+
+  <section class="panel" aria-labelledby="s2">
+    <div class="step-head"><span class="num">2</span><h2 id="s2">Train the model</h2></div>
+    <p>The network starts with random weights and guesses at random (about 33% right). On every batch of 32 images it measures how wrong it was, then nudges its weights to be a little less wrong. 15% of the images are held back as a validation set the model never trains on, so you can see whether it really generalizes.</p>
+    <div class="cols">
+      <pre aria-label="Model code"><span class="c">// The model: two convolution blocks, then a classifier</span>
+const model = tf.sequential();
+model.add(tf.layers.conv2d({inputShape:[28,28,1],
+  filters:8, kernelSize:3, activation:'relu'}));
+model.add(tf.layers.maxPooling2d({poolSize:2}));
+model.add(tf.layers.conv2d({filters:16,
+  kernelSize:3, activation:'relu'}));
+model.add(tf.layers.maxPooling2d({poolSize:2}));
+model.add(tf.layers.flatten());
+model.add(tf.layers.dense({units:32, activation:'relu'}));
+model.add(tf.layers.dense({units:3, activation:'softmax'}));
+
+model.compile({optimizer: tf.train.adam(0.003),
+  loss:'categoricalCrossentropy', metrics:['accuracy']});
+
+<span class="c">// Training: 8 passes over the data</span>
+await model.fit(xs, ys, {epochs:8, batchSize:32,
+  validationSplit:0.15, shuffle:true});</pre>
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+        <div class="chartbox"><canvas id="chart" aria-label="Accuracy per epoch chart"></canvas></div>
+        <div class="legend"><span><i class="sw" style="background:var(--accent)"></i>training accuracy</span><span><i class="sw" style="background:var(--accent2)"></i>validation accuracy</span></div>
+        <div class="row"><button class="primary" id="trainBtn" disabled>Train model</button><span class="mono muted" id="status">Waiting for TensorFlow.js</span></div>
+        <div class="bar" aria-hidden="true"><i id="prog"></i></div>
+        <div class="mono log muted" id="log">Epoch results will appear here.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="s3">
+    <div class="step-head"><span class="num">3</span><h2 id="s3">Use the trained model</h2></div>
+    <p>Draw a circle, square or triangle. The page shrinks your drawing to 28×28 pixels, the same format as the training data, and calls <code class="mono">model.predict()</code>. The output is three probabilities that add up to 100%.</p>
+    <div class="cols">
+      <div class="padwrap">
+        <canvas id="pad" width="280" height="280" aria-label="Drawing pad"></canvas>
+        <div class="row"><button class="primary" id="predictBtn" disabled>Recognize</button><button id="clearBtn">Clear</button><button id="sampleBtn">Draw a sample for me</button></div>
+      </div>
+      <div class="result">
+        <div class="verdict" id="verdict">Train the model first</div>
+        <div id="probs" style="display:flex;flex-direction:column;gap:10px"></div>
+        <div class="seen"><canvas id="seen" width="28" height="28" aria-label="What the model sees"></canvas><p class="note">What the model actually receives: your drawing cropped, centered and reduced to 28×28 pixels.</p></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script>
+const CLASSES=['circle','square','triangle'], S=28, N=1800, EPOCHS=8;
+const $=id=>document.getElementById(id);
+const rand=(a,b)=>a+Math.random()*(b-a);
+const work=document.createElement('canvas');work.width=work.height=S;
+const wctx=work.getContext('2d',{willReadFrequently:true});
+
+function shapePoints(cls,r){
+  const pts=[];
+  if(cls==='circle'){
+    const sx=rand(.85,1.15),n=30,start=rand(0,6.28),extra=rand(-.15,.25);
+    for(let i=0;i<=n;i++){const a=start+(i/n)*(Math.PI*2+extra),rr=r*rand(.95,1.05);pts.push([Math.cos(a)*rr*sx,Math.sin(a)*rr/sx]);}
+    return pts;
+  }
+  const k=cls==='square'?4:3,off=cls==='square'?Math.PI/4:-Math.PI/2,corners=[];
+  for(let i=0;i<k;i++){const a=off+i*2*Math.PI/k+rand(-.12,.12),rr=r*rand(.88,1.08);corners.push([Math.cos(a)*rr,Math.sin(a)*rr]);}
+  for(let i=0;i<k;i++){const p=corners[i],q=corners[(i+1)%k];for(let t=0;t<6;t++){const f=t/6;pts.push([p[0]+(q[0]-p[0])*f+rand(-.35,.35),p[1]+(q[1]-p[1])*f+rand(-.35,.35)]);}}
+  pts.push([corners[0][0]+rand(-.6,.6),corners[0][1]+rand(-.6,.6)]);
+  return pts;
+}
+function drawShape(ctx,cls,size,lw){
+  const sc=size/S;
+  ctx.fillStyle='#000';ctx.fillRect(0,0,size,size);
+  ctx.strokeStyle='#fff';ctx.lineWidth=lw*sc;ctx.lineJoin='round';ctx.lineCap='round';
+  const r=rand(6,11),cx=rand(r+2.5,S-r-2.5),cy=rand(r+2.5,S-r-2.5),rot=rand(0,Math.PI*2),c=Math.cos(rot),s=Math.sin(rot);
+  const pts=shapePoints(cls,r);
+  ctx.beginPath();
+  pts.forEach(([x,y],i)=>{const X=(cx+x*c-y*s)*sc,Y=(cy+x*s+y*c)*sc;i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);});
+  ctx.stroke();
+}
+function pixelsOf(ctx){const d=ctx.getImageData(0,0,S,S).data,o=new Float32Array(S*S);for(let i=0;i<S*S;i++)o[i]=d[i*4]/255;return o;}
+
+/* Step 1: dataset */
+let data,labels;
+function makeDataset(){
+  data=new Float32Array(N*S*S);labels=new Int32Array(N);
+  for(let i=0;i<N;i++){const c=i%3;drawShape(wctx,CLASSES[c],S,rand(1.3,2.6));data.set(pixelsOf(wctx),i*S*S);labels[i]=c;}
+}
+function showGallery(){
+  const g=$('gallery');g.innerHTML='';
+  for(let j=0;j<24;j++){
+    const i=Math.floor(Math.random()*N),cv=document.createElement('canvas');cv.width=cv.height=S;
+    const ctx=cv.getContext('2d'),img=ctx.createImageData(S,S);
+    for(let p=0;p<S*S;p++){const v=data[i*S*S+p]*255;img.data[p*4]=img.data[p*4+1]=img.data[p*4+2]=v;img.data[p*4+3]=255;}
+    ctx.putImageData(img,0,0);
+    const d=document.createElement('div');d.className='thumb';d.append(cv);const sp=document.createElement('span');sp.textContent=CLASSES[labels[i]];d.append(sp);g.append(d);
+  }
+}
+makeDataset();showGallery();
+$('nTotal').textContent=N.toLocaleString();
+$('regen').onclick=showGallery;
+
+/* Step 2: chart + training */
+let history={acc:[],val:[]};
+function tok(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function drawChart(){
+  const cv=$('chart'),dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+  const L=44,R=14,T=14,B=28,pw=W-L-R,ph=H-T-B;
+  ctx.font='11px '+tok('--font-mono');ctx.fillStyle=tok('--muted');ctx.strokeStyle=tok('--line');ctx.lineWidth=1;
+  [0,.25,.5,.75,1].forEach(v=>{const y=T+ph*(1-v);ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(L+pw,y);ctx.stroke();ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(Math.round(v*100)+'%',L-6,y);});
+  ctx.textAlign='center';ctx.textBaseline='top';
+  for(let e=1;e<=EPOCHS;e++){const x=L+pw*(e-1)/(EPOCHS-1);ctx.fillText(e,x,T+ph+8);}
+  if(!history.acc.length){ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('Press "Train model" to start',L+pw/2,T+ph/2);return;}
+  [['acc','--accent'],['val','--accent2']].forEach(([k,c])=>{
+    ctx.strokeStyle=tok(c);ctx.fillStyle=tok(c);ctx.lineWidth=2.25;ctx.beginPath();
+    history[k].forEach((v,i)=>{const x=L+pw*i/(EPOCHS-1),y=T+ph*(1-v);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
+    const i=history[k].length-1,x=L+pw*i/(EPOCHS-1),y=T+ph*(1-history[k][i]);ctx.beginPath();ctx.arc(x,y,3.5,0,7);ctx.fill();
+  });
+}
+drawChart();addEventListener('resize',drawChart);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',drawChart);
+
+let model=null,xs=null,ys=null;
+function buildModel(){
+  const m=tf.sequential();
+  m.add(tf.layers.conv2d({inputShape:[S,S,1],filters:8,kernelSize:3,activation:'relu'}));
+  m.add(tf.layers.maxPooling2d({poolSize:2}));
+  m.add(tf.layers.conv2d({filters:16,kernelSize:3,activation:'relu'}));
+  m.add(tf.layers.maxPooling2d({poolSize:2}));
+  m.add(tf.layers.flatten());
+  m.add(tf.layers.dense({units:32,activation:'relu'}));
+  m.add(tf.layers.dense({units:3,activation:'softmax'}));
+  m.compile({optimizer:tf.train.adam(0.003),loss:'categoricalCrossentropy',metrics:['accuracy']});
+  return m;
+}
+async function train(){
+  $('trainBtn').disabled=true;$('predictBtn').disabled=true;$('regen').disabled=true;
+  if(model)model.dispose();if(xs){xs.dispose();ys.dispose();}
+  xs=tf.tensor4d(data,[N,S,S,1]);
+  ys=tf.tidy(()=>tf.oneHot(tf.tensor1d(labels,'int32'),3));
+  model=buildModel();history={acc:[],val:[]};drawChart();$('log').innerHTML='';
+  const perEpoch=Math.ceil(N*0.85/32),t0=performance.now();let epoch=0;
+  await model.fit(xs,ys,{epochs:EPOCHS,batchSize:32,validationSplit:.15,shuffle:true,callbacks:{
+    onBatchEnd:async(b,logs)=>{
+      $('prog').style.width=((epoch*perEpoch+b+1)/(EPOCHS*perEpoch)*100)+'%';
+      $('status').textContent=`Epoch ${epoch+1}/${EPOCHS} · batch ${b+1}/${perEpoch} · loss ${logs.loss.toFixed(3)}`;
+      if(b%4===0)await tf.nextFrame();
+    },
+    onEpochEnd:async(e,logs)=>{
+      epoch=e+1;
+      const a=logs.acc??logs.accuracy,v=logs.val_acc??logs.val_accuracy;
+      history.acc.push(a);history.val.push(v);drawChart();
+      const line=document.createElement('div');
+      line.textContent=`epoch ${e+1}: loss ${logs.loss.toFixed(3)} · accuracy ${(a*100).toFixed(1)}% · validation ${(v*100).toFixed(1)}%`;
+      $('log').prepend(line);await tf.nextFrame();
+    }
+  }});
+  const secs=((performance.now()-t0)/1000).toFixed(1);
+  $('status').textContent=`Done in ${secs}s · validation accuracy ${(history.val.at(-1)*100).toFixed(1)}%`;
+  $('trainBtn').textContent='Train again from scratch';
+  $('trainBtn').disabled=false;$('predictBtn').disabled=false;$('regen').disabled=false;
+  $('verdict').textContent='Model ready. Draw a shape.';
+}
+$('trainBtn').onclick=train;
+
+/* Step 3: drawing pad + prediction */
+const pad=$('pad'),pctx=pad.getContext('2d',{willReadFrequently:true});
+function clearPad(){pctx.fillStyle='#000';pctx.fillRect(0,0,280,280);}
+clearPad();
+let drawing=false,last=null;
+function pos(e){const r=pad.getBoundingClientRect();return[(e.clientX-r.left)*280/r.width,(e.clientY-r.top)*280/r.height];}
+pad.addEventListener('pointerdown',e=>{drawing=true;last=pos(e);pad.setPointerCapture(e.pointerId);pctx.fillStyle='#fff';pctx.beginPath();pctx.arc(last[0],last[1],8,0,7);pctx.fill();});
+pad.addEventListener('pointermove',e=>{if(!drawing)return;const p=pos(e);pctx.strokeStyle='#fff';pctx.lineWidth=16;pctx.lineCap='round';pctx.beginPath();pctx.moveTo(...last);pctx.lineTo(...p);pctx.stroke();last=p;});
+['pointerup','pointercancel','pointerleave'].forEach(t=>pad.addEventListener(t,()=>{drawing=false;}));
+$('clearBtn').onclick=()=>{clearPad();$('probs').innerHTML='';const s=$('seen').getContext('2d');s.fillStyle='#000';s.fillRect(0,0,S,S);if(model)$('verdict').textContent='Model ready. Draw a shape.';};
+$('sampleBtn').onclick=()=>{drawShape(pctx,CLASSES[Math.floor(Math.random()*3)],280,2);if(model)predict();};
+
+function preprocess(){
+  const d=pctx.getImageData(0,0,280,280).data;let x0=280,y0=280,x1=-1,y1=-1;
+  for(let y=0;y<280;y++)for(let x=0;x<280;x++)if(d[(y*280+x)*4]>40){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+  if(x1<0)return null;
+  const w=x1-x0+1,h=y1-y0+1,side=Math.max(w,h),target=20;
+  const mid=document.createElement('canvas');mid.width=mid.height=112;const mctx=mid.getContext('2d');
+  mctx.fillStyle='#000';mctx.fillRect(0,0,112,112);mctx.imageSmoothingQuality='high';
+  const k=target*4/side;mctx.drawImage(pad,x0,y0,w,h,(112-w*k)/2,(112-h*k)/2,w*k,h*k);
+  wctx.fillStyle='#000';wctx.fillRect(0,0,S,S);wctx.imageSmoothingQuality='high';wctx.drawImage(mid,0,0,S,S);
+  $('seen').getContext('2d').drawImage(work,0,0);
+  return pixelsOf(wctx);
+}
+function predict(){
+  if(!model)return;
+  const px=preprocess();
+  if(!px){$('verdict').textContent='Draw a shape first';return;}
+  const probs=tf.tidy(()=>model.predict(tf.tensor4d(px,[1,S,S,1])).dataSync());
+  const best=probs.indexOf(Math.max(...probs));
+  $('verdict').textContent=`It's a ${CLASSES[best]} (${(probs[best]*100).toFixed(0)}% sure)`;
+  $('probs').innerHTML=CLASSES.map((c,i)=>`<div class="probrow${i===best?' top':''}"><span>${c}</span><div class="bar"><i style="width:${(probs[i]*100).toFixed(1)}%"></i></div><span class="mono">${(probs[i]*100).toFixed(1)}%</span></div>`).join('');
+}
+$('predictBtn').onclick=predict;
+
+/* Boot */
+if(window.tf){
+  tf.ready().then(()=>{$('backend').textContent=`TensorFlow.js ${tf.version.tfjs} · backend: ${tf.getBackend()}`;$('trainBtn').disabled=false;$('status').textContent='Ready to train';});
+}else{
+  $('backend').textContent='TensorFlow.js could not load. Check your connection and reload the page.';
+}
+</script>
+</body>
+</html>
